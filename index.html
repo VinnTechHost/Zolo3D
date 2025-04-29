@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zolo3D - Ondas Interactivas</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .hero-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .content {
+            position: relative;
+            z-index: 10;
+            text-align: center;
+            color: white;
+            padding: 2rem;
+            backdrop-filter: blur(5px);
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 20px;
+            max-width: 600px;
+        }
+        
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+        }
+        
+        p {
+            font-size: 1.5rem;
+            color: #ddd;
+            margin-bottom: 2rem;
+        }
+        
+        .btn {
+            padding: 0.8rem 2rem;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            color: white;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: bold;
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: inline-block;
+            margin: 0 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(76, 175, 80, 0.5);
+        }
+        
+        .wave-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            cursor: none;
+        }
+        
+        /* Cursor personalizado */
+        .cursor {
+            position: fixed;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba(76, 175, 80, 0.2);
+            border: 2px solid rgba(33, 150, 243, 0.5);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 9999;
+            transition: transform 0.1s, background-color 0.3s;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5), 0 0 20px rgba(33, 150, 243, 0.3);
+        }
+        
+        .cursor.active {
+            transform: translate(-50%, -50%) scale(1.5);
+            background-color: rgba(33, 150, 243, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="cursor"></div>
+    
+    <div class="hero-container">
+        <div class="wave-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        <div class="content">
+            <h1>Zolo3D</h1>
+            <p>¡Haz realidad el futuro del diseño en 3D con Zolo3D!</p>
+            <!-- <div>
+                <a href="#" class="btn">Ver Catálogo</a>
+                <a href="#" class="btn">Solicitar Impresión</a>
+            </div> -->
+            <p>¡Pronto entre nosotros!</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cursor personalizado
+            const cursor = document.querySelector('.cursor');
+            let mouseX = 0, mouseY = 0;
+            let cursorVisible = false;
+            
+            // Detectar si el dispositivo es táctil
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+            
+            if (!isTouchDevice) {
+                // Solo mostrar cursor personalizado en dispositivos no táctiles
+                document.addEventListener('mousemove', (e) => {
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                    
+                    if (!cursorVisible) {
+                        cursor.style.opacity = '1';
+                        cursorVisible = true;
+                    }
+                    
+                    cursor.style.transform = `translate(${mouseX}px, ${mouseY}px)`;
+                });
+                
+                document.addEventListener('mousedown', () => {
+                    cursor.classList.add('active');
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    cursor.classList.remove('active');
+                });
+                
+                document.addEventListener('mouseleave', () => {
+                    cursor.style.opacity = '0';
+                    cursorVisible = false;
+                });
+                
+                // Ocultar cursor estándar
+                document.body.style.cursor = 'none';
+            } else {
+                // Ocultar cursor personalizado en dispositivos táctiles
+                cursor.style.display = 'none';
+            }
+            
+            // Canvas y contexto
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Establecer tamaño del canvas
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Definir clase Partícula
+            class Particle {
+                constructor() {
+                    this.reset();
+                }
+                
+                reset() {
+                    // Posición aleatoria
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    
+                    // Tamaño aleatorio
+                    this.size = Math.random() * 3 + 0.5;
+                    
+                    // Velocidad aleatoria
+                    this.speedX = Math.random() * 1 - 0.5;
+                    this.speedY = Math.random() * 1 - 0.5;
+                    
+                    // Color aleatorio
+                    const colors = [
+                        'rgba(100, 50, 255, ',
+                        'rgba(50, 150, 255, ',
+                        'rgba(50, 255, 200, ',
+                        'rgba(150, 255, 50, ',
+                        'rgba(255, 200, 50, ',
+                        'rgba(255, 100, 50, ',
+                        'rgba(255, 50, 150, '
+                    ];
+                    
+                    this.color = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    // Opacidad aleatoria
+                    this.alpha = Math.random() * 0.5 + 0.2;
+                    
+                    // Tiempo de vida
+                    this.life = 0;
+                    this.maxLife = Math.random() * 100 + 100;
+                }
+                
+                update(deltaTime, mouseDistFactor) {
+                    // Actualizar posición
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+                    
+                    // Efecto del cursor
+                    if (!isTouchDevice && cursorVisible) {
+                        const dx = mouseX - this.x;
+                        const dy = mouseY - this.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < 150) {
+                            const force = 150 / Math.max(50, dist) * mouseDistFactor;
+                            this.speedX -= dx * force * 0.01;
+                            this.speedY -= dy * force * 0.01;
+                        }
+                    }
+                    
+                    // Límites y rebote
+                    if (this.x < 0 || this.x > canvas.width) {
+                        this.speedX *= -0.8;
+                    }
+                    
+                    if (this.y < 0 || this.y > canvas.height) {
+                        this.speedY *= -0.8;
+                    }
+                    
+                    // Fricción
+                    this.speedX *= 0.99;
+                    this.speedY *= 0.99;
+                    
+                    // Incrementar vida
+                    this.life += deltaTime * 30;
+                    
+                    // Ajustar opacidad basada en vida
+                    this.currentAlpha = this.alpha * Math.min(1, (this.maxLife - this.life) / 30);
+                    
+                    // Resetear si la vida termina
+                    if (this.life >= this.maxLife) {
+                        this.reset();
+                    }
+                }
+                
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color + this.currentAlpha + ')';
+                    ctx.fill();
+                }
+            }
+            
+            // Definir clase Onda
+            class Wave {
+                constructor(amplitude, period, phaseSpeed, color, lineWidth, direction) {
+                    this.amplitude = amplitude;
+                    this.period = period;
+                    this.phaseSpeed = phaseSpeed;
+                    this.lineWidth = lineWidth;
+                    this.direction = direction; // 1 hacia la derecha, -1 hacia la izquierda
+                    this.phase = 0;
+                    this.colorStart = color;
+                    this.colorCurrent = color;
+                    this.colorTarget = this.getRandomColor();
+                    this.colorTransitionProgress = 0;
+                    this.colorTransitionDuration = 5; // segundos para cambiar de color
+                    this.paths = [];
+                    this.numPaths = 5; // Número de líneas por onda
+                    
+                    // Crear múltiples caminos para cada onda
+                    for (let i = 0; i < this.numPaths; i++) {
+                        this.paths.push({
+                            amplitude: this.amplitude * (0.8 + Math.random() * 0.4), // Variación en amplitud
+                            period: this.period * (0.9 + Math.random() * 0.2), // Variación en período
+                            phase: Math.random() * Math.PI * 2, // Fase aleatoria
+                        });
+                    }
+                    
+                    // Efecto de ondas al clic
+                    this.ripples = [];
+                }
+                
+                getRandomColor() {
+                    const colors = [
+                        'rgba(100, 50, 255, 0.8)',  // Púrpura
+                        'rgba(50, 150, 255, 0.8)',  // Azul
+                        'rgba(50, 255, 200, 0.8)',  // Turquesa
+                        'rgba(150, 255, 50, 0.8)',  // Verde
+                        'rgba(255, 200, 50, 0.8)',  // Amarillo
+                        'rgba(255, 100, 50, 0.8)',  // Naranja
+                        'rgba(255, 50, 150, 0.8)'   // Rosa
+                    ];
+                    
+                    let newColor;
+                    do {
+                        newColor = colors[Math.floor(Math.random() * colors.length)];
+                    } while (newColor === this.colorTarget); // Evitar repetir el mismo color
+                    
+                    return newColor;
+                }
+                
+                addRipple(x, strength) {
+                    this.ripples.push({
+                        x: x,
+                        y: canvas.height / 2,
+                        radius: 0,
+                        maxRadius: 200,
+                        strength: strength,
+                        alpha: 0.8,
+                        lifetime: 0
+                    });
+                }
+                
+                update(deltaTime, mouseX, mouseY, isClicked) {
+                    // Actualizar fase según dirección
+                    this.phase += this.phaseSpeed * this.direction * deltaTime;
+                    
+                    // Actualizar transición de color
+                    this.colorTransitionProgress += deltaTime / this.colorTransitionDuration;
+                    
+                    if (this.colorTransitionProgress >= 1) {
+                        this.colorStart = this.colorTarget;
+                        this.colorTarget = this.getRandomColor();
+                        this.colorTransitionProgress = 0;
+                    }
+                    
+                    // Interpolación de color
+                    this.colorCurrent = this.lerpColor(this.colorStart, this.colorTarget, this.colorTransitionProgress);
+                    
+                    // Interacción con el mouse
+                    if (!isTouchDevice && cursorVisible) {
+                        // Detectar movimiento rápido
+                        if (this.lastMouseX !== undefined) {
+                            const mouseSpeedX = mouseX - this.lastMouseX;
+                            const mouseSpeedY = mouseY - this.lastMouseY;
+                            const mouseSpeed = Math.sqrt(mouseSpeedX * mouseSpeedX + mouseSpeedY * mouseSpeedY);
+                            
+                            // Si el mouse se mueve rápido, generar un ripple
+                            if (mouseSpeed > 20) {
+                                this.addRipple(mouseX, 15);
+                            }
+                        }
+                        
+                        this.lastMouseX = mouseX;
+                        this.lastMouseY = mouseY;
+                        
+                        // Si se hace clic, generar un ripple más grande
+                        if (isClicked && (!this.lastClickTime || Date.now() - this.lastClickTime > 300)) {
+                            this.addRipple(mouseX, 30);
+                            this.lastClickTime = Date.now();
+                        }
+                    }
+                    
+                    // Actualizar ripples
+                    for (let i = this.ripples.length - 1; i >= 0; i--) {
+                        const ripple = this.ripples[i];
+                        ripple.radius += 100 * deltaTime;
+                        ripple.alpha -= deltaTime * 0.5;
+                        ripple.lifetime += deltaTime;
+                        
+                        if (ripple.alpha <= 0 || ripple.radius > ripple.maxRadius) {
+                            this.ripples.splice(i, 1);
+                        }
+                    }
+                }
+                
+                lerpColor(colorStart, colorTarget, t) {
+                    // Extraer valores RGB
+                    const rgbaStart = colorStart.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([.\d]+))?\)/);
+                    const rgbaTarget = colorTarget.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([.\d]+))?\)/);
+                    
+                    if (!rgbaStart || !rgbaTarget) return colorStart;
+                    
+                    const r1 = parseInt(rgbaStart[1]), g1 = parseInt(rgbaStart[2]), b1 = parseInt(rgbaStart[3]);
+                    const r2 = parseInt(rgbaTarget[1]), g2 = parseInt(rgbaTarget[2]), b2 = parseInt(rgbaTarget[3]);
+                    const a1 = rgbaStart[4] ? parseFloat(rgbaStart[4]) : 1;
+                    const a2 = rgbaTarget[4] ? parseFloat(rgbaTarget[4]) : 1;
+                    
+                    const r = Math.round(r1 + (r2 - r1) * t);
+                    const g = Math.round(g1 + (g2 - g1) * t);
+                    const b = Math.round(b1 + (b2 - b1) * t);
+                    const a = a1 + (a2 - a1) * t;
+                    
+                    return `rgba(${r}, ${g}, ${b}, ${a})`;
+                }
+                
+                draw() {
+                    const centerY = canvas.height / 2;
+                    
+                    // Dibujar ondas
+                    this.paths.forEach((path, index) => {
+                        const lineWidth = this.lineWidth * (1 - index / this.numPaths * 0.3);
+                        const alpha = 0.5 - (index / this.numPaths * 0.1);
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(0, centerY);
+                        
+                        // Dibujar onda suave con efecto de ripples
+                        for (let x = 0; x < canvas.width; x += 2) {
+                            let y = centerY + 
+                                  path.amplitude * 
+                                  Math.sin((x / canvas.width) * path.period * Math.PI * 2 + this.phase + path.phase);
+                            
+                            // Aplicar efecto de ripples
+                            for (const ripple of this.ripples) {
+                                const dx = x - ripple.x;
+                                const distance = Math.abs(dx);
+                                
+                                // Si el punto está cerca del radio del ripple, aplicar efecto
+                                const rippleWidth = 30;
+                                const rippleCenter = ripple.radius;
+                                
+                                if (distance > rippleCenter - rippleWidth && distance < rippleCenter + rippleWidth) {
+                                    const rippleEffect = (1 - Math.abs(distance - rippleCenter) / rippleWidth) * 
+                                                         ripple.strength * ripple.alpha * 
+                                                         (dx > 0 ? 1 : -1); // Dirección de la ondulación
+                                    
+                                    y += rippleEffect;
+                                }
+                            }
+                            
+                            ctx.lineTo(x, y);
+                        }
+                        
+                        ctx.strokeStyle = this.colorCurrent;
+                        ctx.lineWidth = lineWidth;
+                        ctx.globalAlpha = alpha;
+                        ctx.stroke();
+                    });
+                    
+                    // Dibujar círculos de ripple
+                    for (const ripple of this.ripples) {
+                        ctx.beginPath();
+                        ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+                        ctx.strokeStyle = this.colorCurrent.replace(/[^,]+\)/, ripple.alpha + ')');
+                        ctx.lineWidth = 2;
+                        ctx.globalAlpha = ripple.alpha * 0.3;
+                        ctx.stroke();
+                    }
+                    
+                    ctx.globalAlpha = 1; // Restablecer transparencia
+                }
+            }
+            
+            // Crear ondas con diferentes direcciones
+            const waves = [
+                // Ondas hacia la derecha
+                new Wave(70, 2, 0.5, 'rgba(100, 50, 255, 0.8)', 3, 1),
+                new Wave(50, 3, 0.3, 'rgba(50, 150, 255, 0.8)', 2.5, 1),
+                new Wave(60, 4, 0.4, 'rgba(50, 255, 200, 0.8)', 3, 1),
+                
+                // Ondas hacia la izquierda
+                new Wave(55, 3, 0.45, 'rgba(255, 100, 50, 0.8)', 2.5, -1),
+                new Wave(65, 2.5, 0.35, 'rgba(255, 200, 50, 0.8)', 3, -1),
+                new Wave(45, 3.5, 0.25, 'rgba(255, 50, 150, 0.8)', 2, -1)
+            ];
+            
+            // Crear partículas
+            const particles = [];
+            const particleCount = Math.min(100, Math.floor(window.innerWidth * window.innerHeight / 10000)); // Ajustar según tamaño de pantalla
+            
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+            
+            // Variables para animación
+            let lastTime = 0;
+            let mouseDistFactor = 0;
+            
+            // Crear ripples aleatorios ocasionalmente
+            setInterval(() => {
+                if (Math.random() < 0.3) { // 30% de probabilidad
+                    const randomWave = waves[Math.floor(Math.random() * waves.length)];
+                    const randomX = Math.random() * canvas.width;
+                    randomWave.addRipple(randomX, Math.random() * 20 + 5);
+                }
+            }, 3000);
+            
+            // Función de animación
+            function animate(currentTime) {
+                requestAnimationFrame(animate);
+                
+                // Calcular deltaTime en segundos
+                const deltaTime = (currentTime - lastTime) / 1000;
+                lastTime = currentTime;
+                
+                // Limitar deltaTime para evitar comportamiento extraño tras pestaña inactiva
+                const dt = Math.min(deltaTime, 0.1);
+                
+                // Actualizar factor de distancia del mouse (para efecto "click")
+                const isClicked = cursor.classList.contains('active');
+                if (isClicked) {
+                    mouseDistFactor = Math.min(mouseDistFactor + dt * 10, 2);
+                } else {
+                    mouseDistFactor = Math.max(mouseDistFactor - dt * 5, 0);
+                }
+                
+                // Limpiar el canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Actualizar y dibujar las ondas
+                waves.forEach(wave => {
+                    wave.update(dt, mouseX, mouseY, isClicked);
+                    wave.draw();
+                });
+                
+                // Actualizar y dibujar partículas
+                particles.forEach(particle => {
+                    particle.update(dt, mouseDistFactor);
+                    particle.draw();
+                });
+            }
+            
+            // Iniciar animación
+            requestAnimationFrame(animate);
+        });
+    </script>
+</body>
+</html>
